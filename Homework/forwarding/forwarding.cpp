@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-uint16_t calculateIPChecksum(uint8_t *packet, size_t len) {
+uint16_t calculateIPChecksum(uint8_t *packet) {
     uint32_t checkSum = 0;
     int IHL = (int) (packet[0] & 0xf) * 4;
     for (int i = 0; i < IHL; i += 2) {
@@ -20,7 +20,7 @@ uint16_t calculateIPChecksum(uint8_t *packet, size_t len) {
 }
 
 bool validateIPChecksum(uint8_t *packet, size_t len) {
-    uint16_t checkCal = calculateIPChecksum(packet, len);
+    uint16_t checkCal = calculateIPChecksum(packet);
     uint16_t checkGet = (uint16_t)((packet[10] << 8) + packet[11]);
     return checkCal == checkGet;
 }
@@ -39,9 +39,9 @@ bool forward(uint8_t *packet, size_t len) {
         return false;
     }
     packet[8] -= 1;
-    uint16_t checkCal = calculateIPChecksum(packet, len);
+    uint16_t checkCal = calculateIPChecksum(packet);
     packet[10] = (uint8_t) (checkCal >> 8);
-    packet[11] = (uint8_t) (checkCal & 0xff);
+    packet[11] = (uint8_t) (checkCal);
     return true;
 }
 

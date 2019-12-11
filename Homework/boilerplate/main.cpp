@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern uint16_t calculateIPChecksum(uint8_t *packet);
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
 extern void update(bool insert, RoutingTableEntry entry);
 extern bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index);
@@ -107,20 +108,50 @@ int main(int argc, char *argv[]) {
                     // 3a.3 request, ref. RFC2453 3.9.1
                     // only need to respond to whole table requests in the lab
                     RipPacket resp;
-                    // TODO: fill resp
                     // assemble
+                    // RIP
+                    uint32_t rip_len = assemble(&resp, &output[20 + 8]);
+                    uint32_t udp_len = rip_len + 8;
+                    uint32_t ip_len = udp_len + 20;
                     // IP
                     output[0] = 0x45;
-                    // ...
+                    output[1] = 0x00;
+                    output[2] = (uint8_t) (ip_len >> 8);
+                    output[3] = (uint8_t) (ip_len);
+                    output[4] = 0x00;
+                    output[5] = 0x00;
+                    output[6] = 0x00;
+                    output[7] = 0x00;
+                    output[8] = 0x01;
+                    output[9] = 0x11;
+                    output[10] = 0x00;
+                    output[11] = 0x00;
+                    output[12] = packet[16];
+                    output[13] = packet[17];
+                    output[14] = packet[18];
+                    output[15] = packet[19];
+                    output[16] = packet[12];
+                    output[17] = packet[13];
+                    output[18] = packet[14];
+                    output[19] = packet[15];
                     // UDP
                     // port = 520
                     output[20] = 0x02;
                     output[21] = 0x08;
-                    // ...
-                    // RIP
-                    uint32_t rip_len = assemble(&resp, &output[20 + 8]);
+                    output[22] = 0x02;
+                    output[23] = 0x08;
+                    output[24] = (uint8_t) (udp_len >> 8);
+                    output[25] = (uint8_t) (udp_len);
+                    output[26] = 0x00;
+                    output[27] = 0x00;
                     // checksum calculation for ip and udp
                     // if you don't want to calculate udp checksum, set it to zero
+                    uint16_t ip_checksum = calculateIPChecksum(output);
+                    uint16_t udp_checksum = 0x0000;
+                    output[10] = (uint8_t) (ip_checksum >> 8);
+                    output[11] = (uint8_t) (ip_checksum);
+                    output[26] = (uint8_t) (udp_checksum >> 8);
+                    output[27] = (uint8_t) (udp_checksum);
                     // send it back
                     HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
                 } else {
