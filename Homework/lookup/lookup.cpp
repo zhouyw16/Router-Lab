@@ -10,6 +10,7 @@
  *uint32_t len; // 小端序，前缀长度
  *uint32_t if_index; // 小端序，出端口编号
  *uint32_t nexthop; // 大端序，下一跳的 IPv4 地址
+ *uint32_t metric; // 路由的开销值
  *} RoutingTableEntry;
  *
  *约定 addr 和 nexthop 以 **大端序** 存储。

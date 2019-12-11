@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <list>
 
 extern uint16_t calculateIPChecksum(uint8_t *packet);
 extern bool validateIPChecksum(uint8_t *packet, size_t len);
@@ -15,7 +16,10 @@ extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
 extern uint32_t assemble(const RipPacket *rip, uint8_t *buffer);
 extern uint32_t joinByte(const uint8_t* begin);
 extern void splitByte(uint8_t* begin, uint32_t variable);
+uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output);
+void buildRipPacket(RipPacket *rip);
 
+extern std::list<RoutingTableEntry> routingTable;
 uint8_t packet[2048];
 uint8_t output[2048];
 // 0: 192.168.3.2
@@ -108,52 +112,11 @@ int main(int argc, char *argv[]) {
                     // 3a.3 request, ref. RFC2453 3.9.1
                     // only need to respond to whole table requests in the lab
                     RipPacket resp;
-                    // assemble
-                    // RIP
-                    uint32_t rip_len = assemble(&resp, &output[20 + 8]);
-                    uint32_t udp_len = rip_len + 8;
-                    uint32_t ip_len = udp_len + 20;
-                    // IP
-                    output[0] = 0x45;
-                    output[1] = 0x00;
-                    output[2] = (uint8_t) (ip_len >> 8);
-                    output[3] = (uint8_t) (ip_len);
-                    output[4] = 0x00;
-                    output[5] = 0x00;
-                    output[6] = 0x00;
-                    output[7] = 0x00;
-                    output[8] = 0x01;
-                    output[9] = 0x11;
-                    output[10] = 0x00;
-                    output[11] = 0x00;
-                    output[12] = packet[16];
-                    output[13] = packet[17];
-                    output[14] = packet[18];
-                    output[15] = packet[19];
-                    output[16] = packet[12];
-                    output[17] = packet[13];
-                    output[18] = packet[14];
-                    output[19] = packet[15];
-                    // UDP
-                    // port = 520
-                    output[20] = 0x02;
-                    output[21] = 0x08;
-                    output[22] = 0x02;
-                    output[23] = 0x08;
-                    output[24] = (uint8_t) (udp_len >> 8);
-                    output[25] = (uint8_t) (udp_len);
-                    output[26] = 0x00;
-                    output[27] = 0x00;
-                    // checksum calculation for ip and udp
-                    // if you don't want to calculate udp checksum, set it to zero
-                    uint16_t ip_checksum = calculateIPChecksum(output);
-                    uint16_t udp_checksum = 0x0000;
-                    output[10] = (uint8_t) (ip_checksum >> 8);
-                    output[11] = (uint8_t) (ip_checksum);
-                    output[26] = (uint8_t) (udp_checksum >> 8);
-                    output[27] = (uint8_t) (udp_checksum);
+                    buildRipPacket(&resp);
+                    uint32_t ip_len;
+                    ip_len = buildIPPacket(&resp, output);
                     // send it back
-                    HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
+                    HAL_SendIPPacket(if_index, output, ip_len, src_mac);
                 } else {
                     // 3a.2 response, ref. RFC2453 3.9.2
                     // update routing table
@@ -200,4 +163,65 @@ int main(int argc, char *argv[]) {
         }
     }
     return 0;
+}
+
+uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output) {
+    // assemble
+    // RIP
+    uint32_t rip_len = assemble(rip, output + 28);
+    uint32_t udp_len = rip_len + 8;
+    uint32_t ip_len = udp_len + 20;
+    // IP
+    output[0] = 0x45;
+    output[1] = 0x00;
+    output[2] = (uint8_t) (ip_len >> 8);
+    output[3] = (uint8_t) (ip_len);
+    output[4] = 0x00;
+    output[5] = 0x00;
+    output[6] = 0x00;
+    output[7] = 0x00;
+    output[8] = 0x01;
+    output[9] = 0x11;
+    output[10] = 0x00;
+    output[11] = 0x00;
+    output[12] = packet[16];
+    output[13] = packet[17];
+    output[14] = packet[18];
+    output[15] = packet[19];
+    output[16] = packet[12];
+    output[17] = packet[13];
+    output[18] = packet[14];
+    output[19] = packet[15];
+    // UDP
+    // port = 520
+    output[20] = 0x02;
+    output[21] = 0x08;
+    output[22] = 0x02;
+    output[23] = 0x08;
+    output[24] = (uint8_t) (udp_len >> 8);
+    output[25] = (uint8_t) (udp_len);
+    output[26] = 0x00;
+    output[27] = 0x00;
+    // checksum calculation for ip and udp
+    // if you don't want to calculate udp checksum, set it to zero
+    uint16_t ip_checksum = calculateIPChecksum(output);
+    uint16_t udp_checksum = 0x0000;
+    output[10] = (uint8_t) (ip_checksum >> 8);
+    output[11] = (uint8_t) (ip_checksum);
+    output[26] = (uint8_t) (udp_checksum >> 8);
+    output[27] = (uint8_t) (udp_checksum);
+
+    return ip_len;
+}
+
+void buildRipPacket(RipPacket *rip) {
+    output -> numEntries = routingTable.size();
+    output -> command = 2;
+    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
+        RipEntry *entry = rip->entries + (it - routingTable.begin());
+        entry->addr = it->addr;
+        entry->len = it->mask;
+        entry->nexthop = it->nexthop;
+        entry->metric = it->metric;
+    }
 }
