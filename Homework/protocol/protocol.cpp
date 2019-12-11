@@ -28,7 +28,7 @@
  *你需要从 IPv4 包中解析出 RipPacket 结构体，也要从 RipPacket 结构体构造出对应的 IP 包 
  *由于 Rip 包结构本身不记录表项的个数，需要从 IP 头的长度中推断，所以在 RipPacket 中额外记录了个数。 
  *需要注意这里的地址都是用 **大端序** 存储的，1.2.3.4 对应 0x04030201 。
-**/
+ */
 
 uint32_t joinByte(const uint8_t* begin) {
     uint32_t res = 0;

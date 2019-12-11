@@ -179,10 +179,14 @@ int main(int argc, char *argv[]) {
                 if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0) {
                     // found
                     memcpy(output, packet, res);
-                    // update ttl and checksum
-                    forward(output, res);
-                    // TODO: you might want to check ttl=0 case
-                    HAL_SendIPPacket(dest_if, output, res, dest_mac);
+                    if (output[8] > 0) {
+                        // if ttl > 0, then update ttl and checksum
+                        forward(output, res);
+                        HAL_SendIPPacket(dest_if, output, res, dest_mac);   
+                    } else {
+                        // if ttl == 0, then responce ICMP Time Exceeded
+                        // TODO: you might want to check ttl=0 case
+                    }
                 } else {
                     // not found
                     // you can drop it

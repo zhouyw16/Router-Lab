@@ -17,7 +17,7 @@
  *保证 addr 仅最低 len 位可能出现非零。
  *当 nexthop 为零时这是一条直连路由。
  *你可以在全局变量中把路由表以一定的数据结构格式保存下来。
-**/
+ */
 
 std::list<RoutingTableEntry> routingTable;
 
@@ -74,8 +74,7 @@ bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index) {
         if (cmpAddress(addr,it-> addr, it->len)) {
             if (res == routingTable.end()) {
                 res = it;
-            }
-            else if (res->len < it->len) {
+            } else if (res->len < it->len) {
                 res = it;
             }
         }
