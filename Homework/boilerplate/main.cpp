@@ -18,6 +18,7 @@ extern uint32_t joinByte(const uint8_t* begin);
 extern void splitByte(uint8_t* begin, uint32_t variable);
 uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output);
 void buildRipPacket(RipPacket *rip);
+void buildRouteEntry(RipEntry *rip, RoutingTableEntry *route);
 
 extern std::list<RoutingTableEntry> routingTable;
 uint8_t packet[2048];
@@ -47,7 +48,8 @@ int main(int argc, char *argv[]) {
             .addr = addrs[i] & 0x00FFFFFF, // big endian
             .len = 24,        // small endian
             .if_index = i,    // small endian
-            .nexthop = 0      // big endian, means direct
+            .nexthop = 0,     // big endian, means direct
+            .metric = 0       // small endian
         };
         update(true, entry);
     }
@@ -124,6 +126,11 @@ int main(int argc, char *argv[]) {
                     // update metric, if_index, nexthop
                     // what is missing from RoutingTableEntry?
                     // TODO: use query and update
+                    for (int i = 0; i < rip.numEntries; i++) {
+                        routingTableEntry entry;
+                        buildRouteEntry(&(rip.entries[i]), &entry);
+                        update(true, entry);
+                    }
                     // triggered updates? ref. RFC2453 3.10.1
                 }
             }
@@ -218,10 +225,18 @@ void buildRipPacket(RipPacket *rip) {
     output -> numEntries = routingTable.size();
     output -> command = 2;
     for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
-        RipEntry *entry = rip->entries + (it - routingTable.begin());
-        entry->addr = it->addr;
-        entry->len = it->mask;
-        entry->nexthop = it->nexthop;
-        entry->metric = it->metric;
+        RipEntry *entry = rip -> entries + (it - routingTable.begin());
+        entry -> addr = it -> addr;
+        entry -> mask = it -> len;
+        entry -> nexthop = it -> nexthop;
+        entry -> metric = it -> metric;
     }
+}
+
+void buildRouteEntry(RipEntry *rip, RoutingTableEntry *route) {
+    route -> addr = rip -> addr;
+    route -> len = rip -> mask;
+    route -> if_index = rip -> 
+    route -> nexthop = rip -> nexthop;
+    route -> metric = rip -> metric;
 }
