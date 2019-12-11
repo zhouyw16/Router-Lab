@@ -39,10 +39,10 @@ int main(int argc, char *argv[]) {
 
     // 0b. Add direct routes
     // For example:
-    // 10.0.0.0/24 if 0
-    // 10.0.1.0/24 if 1
-    // 10.0.2.0/24 if 2
-    // 10.0.3.0/24 if 3
+    // 192.168.3.0/24 if 0
+    // 192.168.4.0/24 if 1
+    // 10.0.2.0/24    if 2
+    // 10.0.3.0/24    if 3
     for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++) {
         RoutingTableEntry entry = {
             .addr = addrs[i] & 0x00FFFFFF, // big endian
@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < N_IFACE_ON_BOARD; i++) {
             if (memcmp(&dst_addr, &addrs[i], sizeof(in_addr_t)) == 0) {
                 dst_is_me = true;
-            break;
+                break;
             }
         }
         // TODO: Handle rip multicast address(224.0.0.9)?
@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
                     // what is missing from RoutingTableEntry?
                     // TODO: use query and update
                     for (int i = 0; i < rip.numEntries; i++) {
-                        routingTableEntry entry;
+                        RoutingTableEntry entry;
                         buildRouteEntry(&(rip.entries[i]), &entry);
                         update(true, entry);
                     }
@@ -222,10 +222,11 @@ uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output) {
 }
 
 void buildRipPacket(RipPacket *rip) {
-    output -> numEntries = routingTable.size();
-    output -> command = 2;
-    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
-        RipEntry *entry = rip -> entries + (it - routingTable.begin());
+    rip -> numEntries = (uint8_t) (routingTable.size());
+    rip -> command = 0x02;
+    int i = 0;
+    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++, i++) {
+        RipEntry *entry = (rip -> entries) + i;
         entry -> addr = it -> addr;
         entry -> mask = it -> len;
         entry -> nexthop = it -> nexthop;
@@ -236,7 +237,7 @@ void buildRipPacket(RipPacket *rip) {
 void buildRouteEntry(RipEntry *rip, RoutingTableEntry *route) {
     route -> addr = rip -> addr;
     route -> len = rip -> mask;
-    route -> if_index = rip -> 
+    route -> if_index = 0;
     route -> nexthop = rip -> nexthop;
     route -> metric = rip -> metric;
 }

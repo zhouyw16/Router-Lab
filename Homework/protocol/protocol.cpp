@@ -38,14 +38,6 @@ uint32_t joinByte(const uint8_t* begin) {
     return res;
 }
 
-uint32_t joinByte(const uint8_t* begin) {
-    uint32_t res = 0;
-    for (int i = 0; i < 4; i++) {
-        res += (begin[i] << (i * 8));
-    }
-    return res;
-}
-
 void splitByte(uint8_t* begin, uint32_t variable) {
     for (int i = 0; i < 4; i++) {
         begin[i] = (uint8_t) (variable >> (i * 8));
@@ -116,12 +108,6 @@ bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
         output -> entries[i].metric = metric;
     }
     return true;
-}
-
-void splitByte(uint8_t* begin, uint32_t variable) {
-    for (int i = 0; i < 4; i++) {
-        begin[i] = (uint8_t) (variable >> (i * 8));
-    }
 }
 
 /**

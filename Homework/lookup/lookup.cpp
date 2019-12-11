@@ -31,17 +31,6 @@ std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry) {
     return routingTable.end();
 }
 
-std::list<RoutingTableEntry> routingTable;
-
-std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry) {
-    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
-        if (it->addr == entry.addr && it->len == entry.len) {
-            return it;
-        }
-    }
-    return routingTable.end();
-}
-
 /**
  * @brief 插入/删除一条路由表表项
  * @param insert 如果要插入则为 true ，要删除则为 false
