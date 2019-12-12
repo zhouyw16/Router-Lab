@@ -21,7 +21,7 @@ extern std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry
 void buildRipPacket(RipPacket *rip, uint32_t if_index); // from table to rip
 uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst); // from rip to ip
 bool updateRoutingTable(const RipPacket* rip, uint32_t if_index); // from rip to table
-bool buildRoutingEntry(const RipEntry *rip, RoutingTableEntry *route, uint32_t if_index); // from rip entry to table entry
+bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t if_index); // from rip entry to table entry
 
 extern std::list<RoutingTableEntry> routingTable;
 uint8_t packet[2048];
@@ -48,12 +48,11 @@ int main(int argc, char *argv[]) {
     // 10.0.3.0/24    if 3
     for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++) {
         RoutingTableEntry entry = {
-            .addr = addrs[i] & 0x00FFFFFF, // big endian
-            .len = 24,        // small endian
-            .if_index = i,    // small endian
-            .nexthop = 0,     // big endian, means direct
-            .metric = 1,      // small endian
-            .if_from = N_IFACE_ON_BOARD    // small endian
+            .addr = addrs[i] & 0x00FFFFFF,  // big endian
+            .len = 24,                      // small endian
+            .if_index = i,                  // small endian
+            .nexthop = 0,                   // big endian, means direct
+            .metric = 1                     // small endian
         };
         update(true, entry);
     }
@@ -198,7 +197,7 @@ int main(int argc, char *argv[]) {
 void buildRipPacket(RipPacket *rip, uint32_t if_index) {
     int i = 0;
     for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
-        if (it -> if_from != if_from) {
+        if (it -> if_index != if_index) {
             RipEntry *entry = (rip -> entries) + i;
             entry -> addr = it -> addr;
             entry -> mask = it -> len;
@@ -258,21 +257,25 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t if_index) {
     bool has_updated = false;
     for (int i = 0; i < rip.numEntries; i++) {
         RoutingTableEntry entry;
-        if (buildRouteEntry(&(rip.entries[i]), (uint32_t)if_index, &entry)) {
+        if (updateRouteEntry(&(rip.entries[i]), (uint32_t)if_index, &entry)) {
             update(true, entry);
             has_updated = true;
         }
     }
+    return has_updated;
 }
 
-bool buildRoutingEntry(const RipEntry *rip, RoutingTableEntry *route, uint32_t if_index) {
-    std::list<RoutingTableEntry>::iterator it = tableQuery(entry);
-    if (it != routingTable.end() && it -> )
-    route -> addr = rip -> addr;
-    route -> len = rip -> mask;
-    route -> if_index = if_index;
-    route -> nexthop = rip -> nexthop;
-    route -> metric = rip -> metric;
-
+bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t if_index) {
+    tableEntry -> addr = ripEntry -> addr;
+    tableEntry -> len = ripEntry -> mask;
+    std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
+    if (it == routingTable.end()) {
+        tableEntry -> if_index = if_index;
+        tableEntry -> nexthop = ripEntry -> ;
+        tableEntry -> metric = ripEntry -> metric + 1;
+        return true;
+    } else {
+        if ()
+    }
     return false;
 }

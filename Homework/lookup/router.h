@@ -7,6 +7,5 @@ typedef struct {
     uint32_t if_index; // 出端口编号
     uint32_t nexthop; // 下一跳的地址，0 表示直连
     uint32_t metric; // 路由的开销值
-    uint32_t if_from;  // 从哪个接口学习到
     // 为了实现 RIP 协议，需要在这里添加额外的字段
 } RoutingTableEntry;
