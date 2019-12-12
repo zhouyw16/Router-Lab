@@ -19,9 +19,9 @@ extern void splitByte(uint8_t* begin, uint32_t variable);
 extern std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry *entry);
 
 void buildRipPacket(RipPacket *rip, uint32_t if_index); // from table to rip
-uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst); // from rip to ip
-bool updateRoutingTable(const RipPacket* rip, uint32_t src, uint32_t if_index); // from rip to table
-bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src, uint32_t if_index); // from rip entry to table entry
+uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src_addr, uint32_t dst_addr); // from rip to ip
+bool updateRoutingTable(const RipPacket* rip, uint32_t src_addr, uint32_t if_index); // from rip to table
+bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src_addr, uint32_t if_index); // from rip entry to table entry
 
 extern std::list<RoutingTableEntry> routingTable;
 uint8_t packet[2048];
@@ -210,7 +210,7 @@ void buildRipPacket(RipPacket *rip, uint32_t if_index) {
     rip -> command = 0x02;
 }
 
-uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst) {
+uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src_addr, uint32_t dst_addr) {
     // assemble
     // RIP
     uint32_t rip_len = assemble(rip, output + 28);
@@ -229,8 +229,8 @@ uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint
     output[9] = 0x11;
     output[10] = 0x00;
     output[11] = 0x00;
-    splitByte(output + 12, src);
-    splitByte(output + 16, dst);
+    splitByte(output + 12, src_addr);
+    splitByte(output + 16, dst_addr);
     // UDP
     // port = 520
     output[20] = 0x02;
@@ -253,11 +253,11 @@ uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint
     return ip_len;
 }
 
-bool updateRoutingTable(const RipPacket* rip, uint32_t src, uint32_t if_index) {
+bool updateRoutingTable(const RipPacket* rip, uint32_t src_addr, uint32_t if_index) {
     bool has_updated = false;
     for (int i = 0; i < rip -> numEntries; i++) {
         RoutingTableEntry entry;
-        if (updateRoutingEntry(rip -> entries + i, &entry, src, if_index)) {
+        if (updateRoutingEntry(rip -> entries + i, &entry, src_addr, if_index)) {
             update(true, entry);
             has_updated = true;
         }
@@ -265,7 +265,7 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t src, uint32_t if_index) {
     return has_updated;
 }
 
-bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src, uint32_t if_index) {
+bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src_addr, uint32_t if_index) {
     std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
     if (it != routingTable.end() && it -> metric <= ripEntry -> metric + 1) {
         return false;
@@ -273,7 +273,7 @@ bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry,
     tableEntry -> addr = ripEntry -> addr;
     tableEntry -> len = ripEntry -> mask;
     tableEntry -> if_index = if_index;
-    tableEntry -> nexthop = src;
+    tableEntry -> nexthop = src_addr;
     tableEntry -> metric = ripEntry -> metric + 1;
     return true;
 }
