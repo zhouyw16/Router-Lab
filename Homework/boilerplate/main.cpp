@@ -16,9 +16,10 @@ extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
 extern uint32_t assemble(const RipPacket *rip, uint8_t *buffer);
 extern uint32_t joinByte(const uint8_t* begin);
 extern void splitByte(uint8_t* begin, uint32_t variable);
+extern std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry);
 uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst);
-void buildRipPacket(RipPacket *rip);
-bool buildRouteEntry(RipEntry *rip, RoutingTableEntry *route);
+void buildRipPacket(const uint32_t* if_index, RipPacket *rip);
+bool buildRouteEntry(const RipEntry *rip, RoutingTableEntry *route);
 
 extern std::list<RoutingTableEntry> routingTable;
 uint8_t packet[2048];
@@ -49,7 +50,8 @@ int main(int argc, char *argv[]) {
             .len = 24,        // small endian
             .if_index = i,    // small endian
             .nexthop = 0,     // big endian, means direct
-            .metric = 0       // small endian
+            .metric = 1,      // small endian
+            .if_from = 0      // small endian
         };
         update(true, entry);
     }
@@ -107,7 +109,7 @@ int main(int argc, char *argv[]) {
         // TODO2: Handle rip multicast address(224.0.0.9)?
         if (dst_addr == 0x090000e0) {
             dst_is_me = true;
-            // dst_addr = 
+            dst_addr = if_index;
         }
 
         if (dst_is_me) {
@@ -119,7 +121,7 @@ int main(int argc, char *argv[]) {
                     // 3a.3 request, ref. RFC2453 3.9.1
                     // only need to respond to whole table requests in the lab
                     RipPacket resp;
-                    buildRipPacket(&resp);
+                    buildRipPacket(&resp, );
                     // when response, dst_addr as src and src_addr as dst
                     uint32_t ip_len;
                     ip_len = buildIPPacket(&resp, output, dst_addr, src_addr);
@@ -231,7 +233,7 @@ void buildRipPacket(RipPacket *rip) {
         entry -> addr = it -> addr;
         entry -> mask = it -> len;
         entry -> nexthop = it -> nexthop;
-        entry -> metric = it -> metric + 1;
+        entry -> metric = it -> metric;
     }
 }
 
@@ -241,5 +243,6 @@ bool buildRouteEntry(RipEntry *rip, RoutingTableEntry *route) {
     route -> if_index = 0;
     route -> nexthop = rip -> nexthop;
     route -> metric = rip -> metric;
+
     return false;
 }
