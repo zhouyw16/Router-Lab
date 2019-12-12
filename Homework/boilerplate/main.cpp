@@ -19,7 +19,7 @@ extern void splitByte(uint8_t* begin, uint32_t variable);
 extern std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry);
 uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst);
 void buildRipPacket(const uint32_t if_from, RipPacket *rip);
-bool buildRouteEntry(const RipEntry *rip, RoutingTableEntry *route);
+bool buildRouteEntry(const RipEntry *rip, const uint32_t if_index, RoutingTableEntry *route);
 
 extern std::list<RoutingTableEntry> routingTable;
 uint8_t packet[2048];
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
         // TODO2: Handle rip multicast address(224.0.0.9)?
         if (dst_addr == 0x090000e0) {
             dst_is_me = true;
-            dst_addr = if_index;
+            dst_addr = addrs[if_index];
         }
 
         if (dst_is_me) {
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
                     // 3a.3 request, ref. RFC2453 3.9.1
                     // only need to respond to whole table requests in the lab
                     RipPacket resp;
-                    buildRipPacket(if_index, &resp);
+                    buildRipPacket((uint32_t)if_index, &resp);
                     // when response, dst_addr as src and src_addr as dst
                     uint32_t ip_len;
                     ip_len = buildIPPacket(&resp, output, dst_addr, src_addr);
@@ -135,11 +135,16 @@ int main(int argc, char *argv[]) {
                     // what is missing from RoutingTableEntry?
                     // TODO3: use query and update
                     // triggered updates? ref. RFC2453 3.10.1
+                    bool has_updated = false;
                     for (int i = 0; i < rip.numEntries; i++) {
                         RoutingTableEntry entry;
-                        if (buildRouteEntry(&(rip.entries[i]), &entry)) {
+                        if (buildRouteEntry(&(rip.entries[i]), (uint32_t)if_index, &entry)) {
                             update(true, entry);
+                            has_updated = true;
                         }
+                    }
+                    if (has_updated) {
+                        // TODO: send info of table update
                     }
                 }
             }
@@ -240,10 +245,12 @@ void buildRipPacket(const uint32_t if_from, RipPacket *rip) {
     rip -> command = 0x02;
 }
 
-bool buildRouteEntry(const RipEntry *rip, RoutingTableEntry *route) {
+bool buildRouteEntry(const RipEntry *rip, const uint32_t if_index, RoutingTableEntry *route) {
+    std::list<RoutingTableEntry>::iterator it = tableQuery(entry);
+    if (it != routingTable.end() && it -> )
     route -> addr = rip -> addr;
     route -> len = rip -> mask;
-    route -> if_index = 0;
+    route -> if_index = if_index;
     route -> nexthop = rip -> nexthop;
     route -> metric = rip -> metric;
 
