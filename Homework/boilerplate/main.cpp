@@ -52,15 +52,15 @@ int main(int argc, char *argv[]) {
             .len = 24,                      // small endian
             .if_index = i,                  // small endian
             .nexthop = 0,                   // big endian, means direct
-            .metric = 1                     // small endian
+            .metric = 1 << 24             // big endian
         };
         update(true, entry);
     }
 
-    uint64_t last_time = 0;
     // multicast MAC for 224.0.0.9 is 01:00:5e:00:00:09
     in_addr_t multi_addr = 0x090000e0;
     macaddr_t multi_mac = {0x01, 0x00, 0x5e, 0x00, 0x00, 0x09};
+    uint64_t last_time = 0;
     while (1) {
         uint64_t time = HAL_GetTicks();
         if (time > last_time + 30 * 1000) { 
@@ -266,14 +266,14 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t src_addr, uint32_t if_ind
 }
 
 bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src_addr, uint32_t if_index) {
-    std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
-    if (it != routingTable.end() && it -> metric <= ripEntry -> metric + 1) {
-        return false;
-    }
     tableEntry -> addr = ripEntry -> addr;
     tableEntry -> len = ripEntry -> mask;
+    std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
+    if (it != routingTable.end() && it -> metric <= ripEntry -> metric + (1 << 24 )) {
+        return false;
+    }
     tableEntry -> if_index = if_index;
     tableEntry -> nexthop = src_addr;
-    tableEntry -> metric = ripEntry -> metric + 1;
+    tableEntry -> metric = ripEntry -> metric + (1 << 24);
     return true;
 }
