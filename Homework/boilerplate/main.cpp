@@ -18,7 +18,7 @@ extern uint32_t joinByte(const uint8_t* begin);
 extern void splitByte(uint8_t* begin, uint32_t variable);
 extern std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry);
 uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst);
-void buildRipPacket(const uint32_t* if_index, RipPacket *rip);
+void buildRipPacket(const uint32_t if_from, RipPacket *rip);
 bool buildRouteEntry(const RipEntry *rip, RoutingTableEntry *route);
 
 extern std::list<RoutingTableEntry> routingTable;
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
             .if_index = i,    // small endian
             .nexthop = 0,     // big endian, means direct
             .metric = 1,      // small endian
-            .if_from = 0      // small endian
+            .if_from = N_IFACE_ON_BOARD    // small endian
         };
         update(true, entry);
     }
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
                     // 3a.3 request, ref. RFC2453 3.9.1
                     // only need to respond to whole table requests in the lab
                     RipPacket resp;
-                    buildRipPacket(&resp, );
+                    buildRipPacket(if_index, &resp);
                     // when response, dst_addr as src and src_addr as dst
                     uint32_t ip_len;
                     ip_len = buildIPPacket(&resp, output, dst_addr, src_addr);
@@ -224,20 +224,23 @@ uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint
     return ip_len;
 }
 
-void buildRipPacket(RipPacket *rip) {
-    rip -> numEntries = (uint8_t) (routingTable.size());
-    rip -> command = 0x02;
+void buildRipPacket(const uint32_t if_from, RipPacket *rip) {
     int i = 0;
-    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++, i++) {
-        RipEntry *entry = (rip -> entries) + i;
-        entry -> addr = it -> addr;
-        entry -> mask = it -> len;
-        entry -> nexthop = it -> nexthop;
-        entry -> metric = it -> metric;
+    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
+        if (it -> if_from != if_from) {
+            RipEntry *entry = (rip -> entries) + i;
+            entry -> addr = it -> addr;
+            entry -> mask = it -> len;
+            entry -> nexthop = it -> nexthop;
+            entry -> metric = it -> metric;  
+            i++;  
+        }
     }
+    rip -> numEntries = (uint32_t) i;
+    rip -> command = 0x02;
 }
 
-bool buildRouteEntry(RipEntry *rip, RoutingTableEntry *route) {
+bool buildRouteEntry(const RipEntry *rip, RoutingTableEntry *route) {
     route -> addr = rip -> addr;
     route -> len = rip -> mask;
     route -> if_index = 0;
