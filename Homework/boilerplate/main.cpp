@@ -16,9 +16,9 @@ extern bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output);
 extern uint32_t assemble(const RipPacket *rip, uint8_t *buffer);
 extern uint32_t joinByte(const uint8_t* begin);
 extern void splitByte(uint8_t* begin, uint32_t variable);
-uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output);
+uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst);
 void buildRipPacket(RipPacket *rip);
-void buildRouteEntry(RipEntry *rip, RoutingTableEntry *route);
+bool buildRouteEntry(RipEntry *rip, RoutingTableEntry *route);
 
 extern std::list<RoutingTableEntry> routingTable;
 uint8_t packet[2048];
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     while (1) {
         uint64_t time = HAL_GetTicks();
         if (time > last_time + 30 * 1000) {
-            // TODO : What to do? 
+            // TODO1 : What to do? 
             // send complete routing table to every interface
             // ref. RFC2453 3.8
             // multicast MAC for 224.0.0.9 is 01:00:5e:00:00:09
@@ -103,7 +103,12 @@ int main(int argc, char *argv[]) {
                 break;
             }
         }
-        // TODO: Handle rip multicast address(224.0.0.9)?
+
+        // TODO2: Handle rip multicast address(224.0.0.9)?
+        if (dst_addr == 0x090000e0) {
+            dst_is_me = true;
+            // dst_addr = 
+        }
 
         if (dst_is_me) {
             // 3a.1
@@ -115,8 +120,9 @@ int main(int argc, char *argv[]) {
                     // only need to respond to whole table requests in the lab
                     RipPacket resp;
                     buildRipPacket(&resp);
+                    // when response, dst_addr as src and src_addr as dst
                     uint32_t ip_len;
-                    ip_len = buildIPPacket(&resp, output);
+                    ip_len = buildIPPacket(&resp, output, dst_addr, src_addr);
                     // send it back
                     HAL_SendIPPacket(if_index, output, ip_len, src_mac);
                 } else {
@@ -125,13 +131,14 @@ int main(int argc, char *argv[]) {
                     // new metric = ?
                     // update metric, if_index, nexthop
                     // what is missing from RoutingTableEntry?
-                    // TODO: use query and update
+                    // TODO3: use query and update
+                    // triggered updates? ref. RFC2453 3.10.1
                     for (int i = 0; i < rip.numEntries; i++) {
                         RoutingTableEntry entry;
-                        buildRouteEntry(&(rip.entries[i]), &entry);
-                        update(true, entry);
+                        if (buildRouteEntry(&(rip.entries[i]), &entry)) {
+                            update(true, entry);
+                        }
                     }
-                    // triggered updates? ref. RFC2453 3.10.1
                 }
             }
         } else {
@@ -154,8 +161,8 @@ int main(int argc, char *argv[]) {
                         forward(output, res);
                         HAL_SendIPPacket(dest_if, output, res, dest_mac);   
                     } else {
+                        // TODO4: you might want to check ttl=0 case
                         // if ttl == 0, then responce ICMP Time Exceeded
-                        // TODO: you might want to check ttl=0 case
                     }
                 } else {
                     // not found
@@ -172,7 +179,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output) {
+uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst) {
     // assemble
     // RIP
     uint32_t rip_len = assemble(rip, output + 28);
@@ -191,14 +198,8 @@ uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output) {
     output[9] = 0x11;
     output[10] = 0x00;
     output[11] = 0x00;
-    output[12] = packet[16];
-    output[13] = packet[17];
-    output[14] = packet[18];
-    output[15] = packet[19];
-    output[16] = packet[12];
-    output[17] = packet[13];
-    output[18] = packet[14];
-    output[19] = packet[15];
+    splitByte(output + 12, src);
+    splitByte(output + 16, dst);
     // UDP
     // port = 520
     output[20] = 0x02;
@@ -230,14 +231,15 @@ void buildRipPacket(RipPacket *rip) {
         entry -> addr = it -> addr;
         entry -> mask = it -> len;
         entry -> nexthop = it -> nexthop;
-        entry -> metric = it -> metric;
+        entry -> metric = it -> metric + 1;
     }
 }
 
-void buildRouteEntry(RipEntry *rip, RoutingTableEntry *route) {
+bool buildRouteEntry(RipEntry *rip, RoutingTableEntry *route) {
     route -> addr = rip -> addr;
     route -> len = rip -> mask;
     route -> if_index = 0;
     route -> nexthop = rip -> nexthop;
     route -> metric = rip -> metric;
+    return false;
 }
