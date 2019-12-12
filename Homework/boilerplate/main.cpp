@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
             .nexthop = 0,                   // big endian, means direct
             .metric = 1 << 24             // big endian
         };
+        //printf("%08x\n", entry.metric);
         update(true, entry);
     }
 
@@ -63,6 +64,7 @@ int main(int argc, char *argv[]) {
     uint64_t last_time = 0;
     while (1) {
         uint64_t time = HAL_GetTicks();
+        //printf("%lu\t%lu\n", last_time, time);
         if (time > last_time + 30 * 1000) { 
             // send complete routing table to every interface
             // ref. RFC2453 3.8
@@ -200,7 +202,7 @@ void buildRipPacket(RipPacket *rip, uint32_t if_index) {
         if (it -> nexthop == 0 || it -> if_index != if_index) {
             RipEntry *entry = (rip -> entries) + i;
             entry -> addr = it -> addr;
-            entry -> mask = it -> len;
+            entry -> mask = 0x00ffffff;
             entry -> nexthop = it -> nexthop;
             entry -> metric = it -> metric;  
             i++;  
@@ -267,7 +269,7 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t src_addr, uint32_t if_ind
 
 bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src_addr, uint32_t if_index) {
     tableEntry -> addr = ripEntry -> addr;
-    tableEntry -> len = ripEntry -> mask;
+    tableEntry -> len = 24;
     std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
     if (it != routingTable.end() && it -> metric <= ripEntry -> metric + (1 << 24 )) {
         return false;
