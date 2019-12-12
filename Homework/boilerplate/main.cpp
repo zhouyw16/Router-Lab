@@ -257,6 +257,8 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t if_index) {
     bool has_updated = false;
     for (int i = 0; i < rip.numEntries; i++) {
         RoutingTableEntry entry;
+        std::list<RoutingTableEntry>::iterator it = tableQuery(entry);
+        if (it == )
         if (updateRouteEntry(&(rip.entries[i]), (uint32_t)if_index, &entry)) {
             update(true, entry);
             has_updated = true;
@@ -266,16 +268,12 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t if_index) {
 }
 
 bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t if_index) {
+    std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
+    if (it != routingTable.end() && it -> metric <= ripEntry -> metric + 1) {
+        return false;
+    }
     tableEntry -> addr = ripEntry -> addr;
     tableEntry -> len = ripEntry -> mask;
-    std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
-    if (it == routingTable.end()) {
-        tableEntry -> if_index = if_index;
-        tableEntry -> nexthop = ripEntry -> ;
-        tableEntry -> metric = ripEntry -> metric + 1;
-        return true;
-    } else {
-        if ()
-    }
-    return false;
+    tableEntry -> metric = ripEntry -> metric + 1;
+    return true;
 }
