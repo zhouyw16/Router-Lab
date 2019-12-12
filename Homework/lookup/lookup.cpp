@@ -22,9 +22,9 @@
 
 std::list<RoutingTableEntry> routingTable;
 
-std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry) {
+std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry *entry) {
     for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
-        if (it->addr == entry.addr && it->len == entry.len) {
+        if (it->addr == entry->addr && it->len == entry->len) {
             return it;
         }
     }
@@ -40,7 +40,7 @@ std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry) {
  * 删除时按照 addr 和 len 匹配。
  */
 void update(bool insert, RoutingTableEntry entry) {
-    std::list<RoutingTableEntry>::iterator it = tableQuery(entry);
+    std::list<RoutingTableEntry>::iterator it = tableQuery(&entry);
     if (insert) {
         if (it != routingTable.end()) {
             *it = entry;
