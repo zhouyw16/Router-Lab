@@ -20,7 +20,7 @@ extern std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry entry
 
 void buildRipPacket(RipPacket *rip, uint32_t if_index); // from table to rip
 uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src, uint32_t dst); // from rip to ip
-bool buildRoutingTable(const RipPacket* rip, uint32_t if_index); // from rip to table
+bool updateRoutingTable(const RipPacket* rip, uint32_t if_index); // from rip to table
 bool buildRoutingEntry(const RipEntry *rip, RoutingTableEntry *route, uint32_t if_index); // from rip entry to table entry
 
 extern std::list<RoutingTableEntry> routingTable;
@@ -59,6 +59,8 @@ int main(int argc, char *argv[]) {
     }
 
     uint64_t last_time = 0;
+    in_addr_t multi_addr = 0x090000e0;
+    macaddr_t multi_mac = {0x01, 0x00, 0x5e, 0x00, 0x00, 0x09};
     while (1) {
         uint64_t time = HAL_GetTicks();
         if (time > last_time + 30 * 1000) {
@@ -109,7 +111,7 @@ int main(int argc, char *argv[]) {
         }
 
         // TODO2: Handle rip multicast address(224.0.0.9)?
-        if (dst_addr == 0x090000e0) {
+        if (dst_addr == multi_addr) {
             dst_is_me = true;
             dst_addr = addrs[if_index];
         }
@@ -137,8 +139,16 @@ int main(int argc, char *argv[]) {
                     // what is missing from RoutingTableEntry?
                     // TODO3: use query and update
                     // triggered updates? ref. RFC2453 3.10.1
-                    if (buildRoutingTable(rip, (uint32_t)if_index)) {
-                        // TODO: send info of table update
+                    if (updateRoutingTable(rip, (uint32_t)if_index)) {
+                        for (int i = 0; i < N_IFACE_ON_BOARD; i++) {
+                            if (i != if_index) {
+                                RipPacket resp;
+                                buildRipPacket(&resp, (uint32_t)i);
+                                uint32_t ip_len;
+                                ip_len = buildIPPacket(&resp, output, multi_addr, src_addr);
+                                HAL_SendIPPacket(i, output, ip_len, multi_mac);                                
+                            }
+                        }
                     }
                     // bool has_updated = false;
                     // for (int i = 0; i < rip.numEntries; i++) {
