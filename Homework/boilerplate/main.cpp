@@ -205,7 +205,8 @@ void buildRipPacket(RipPacket *rip, uint32_t if_index) {
         if (it -> nexthop == 0 || it -> if_index != if_index) {
             RipEntry *entry = (rip -> entries) + i;
             entry -> addr = it -> addr;
-            entry -> mask = 0x00ffffff;
+            //entry -> mask = 0x00ffffff;
+            entry -> mask = (1 << it -> len) -1;
             entry -> nexthop = it -> nexthop;
             entry -> metric = it -> metric;  
             i++;  
@@ -272,7 +273,7 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t src_addr, uint32_t if_ind
 
 bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src_addr, uint32_t if_index) {
     tableEntry -> addr = ripEntry -> addr;
-    tableEntry -> len = 24;
+    tableEntry -> len = (uint32_t) (ripEntry -> mask == 0 ? 0 : 32 - __builtin_clz(ripEntry -> mask));
     std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
     if (it != routingTable.end() && it -> metric <= ripEntry -> metric + (1 << 24 )) {
         return false;
