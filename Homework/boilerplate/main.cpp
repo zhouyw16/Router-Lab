@@ -25,14 +25,14 @@ bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry,
 void showRoutingTable();
 
 extern std::list<RoutingTableEntry> routingTable;
-uint8_t packet[2048];
-uint8_t output[2048];
-// 0: 192.168.3.2
-// 1: 192.168.4.1
+uint8_t packet[8192];
+uint8_t output[8192];
+// 0: 192.168.4.2
+// 1: 192.168.5.2
 // 2: 10.0.2.1
 // 3: 10.0.3.1
 // 你可以按需进行修改，注意端序
-in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0203a8c0, 0x0104a8c0, 0x0102000a, 0x0103000a};
+in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0204a8c0, 0x0205a8c0, 0x0102000a, 0x0103000a};
 
 int main(int argc, char *argv[]) {
     // 0a.
@@ -157,8 +157,8 @@ int main(int argc, char *argv[]) {
                                 HAL_SendIPPacket(i, output, ip_len, multi_mac);                                
                             }
                         }
+                        showRoutingTable();
                     }
-                    showRoutingTable();
                 }
             }
         } else {
@@ -287,9 +287,12 @@ bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry,
 void showRoutingTable() {
     printf("Routing Table : \n");
     int i = 0;
-    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
+    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end() && i < 10; it++) {
             printf("entry %d:  ", i);
             printf("addr: %08x  len: %08x  if_index: %08x  nexthop: %08x  metric: %08x\n", it->addr, it->len, it->if_index, it->nexthop, it->metric);
             i++;  
+    }
+    if (i >= 10) {
+        printf("entry num: %d\n", i);
     }
 }
