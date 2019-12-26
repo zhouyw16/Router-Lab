@@ -200,17 +200,21 @@ int main(int argc, char *argv[]) {
 }
 
 void buildRipPacket(RipPacket *rip, uint32_t if_index) {
+    std::list<RoutingTableEntry>::iterator it = routingTable.begin();
     int i = 0;
-    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
-        if (it -> nexthop == 0 || it -> if_index != if_index) {
-            RipEntry *entry = (rip -> entries) + i;
-            entry -> addr = it -> addr;
-            //entry -> mask = 0x00ffffff;
-            entry -> mask = (1 << it -> len) -1;
-            entry -> nexthop = it -> nexthop;
-            entry -> metric = it -> metric;  
-            i++;  
-        }
+    while (i < routingTable.size()) {
+        int j = 0;
+        for (; it != routingTable.end() && j < 25; it++) {
+            if (it -> nexthop == 0 || it -> if_index != if_index) {
+                RipEntry *entry = (rip -> entries) + i;
+                entry -> addr = it -> addr;
+                entry -> mask = (1 << it -> len) -1;
+                entry -> nexthop = it -> nexthop;
+                entry -> metric = it -> metric;  
+                i++;  
+                j++;
+            }
+        }        
     }
     rip -> numEntries = (uint32_t) i;
     rip -> command = 0x02;
