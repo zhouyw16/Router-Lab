@@ -34,10 +34,46 @@ uint8_t output[2048];
 in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0203a8c0, 0x0104a8c0, 0x0102000a, 0x0103000a};
 
 int main(int argc, char *argv[]) {
+<<<<<<< HEAD
     // 0a.
     int res = HAL_Init(1, addrs);
     if (res < 0) {
         return res;
+=======
+  // 0a.
+  int res = HAL_Init(1, addrs);
+  if (res < 0) {
+    return res;
+  }
+
+  // 0b. Add direct routes
+  // For example:
+  // 10.0.0.0/24 if 0
+  // 10.0.1.0/24 if 1
+  // 10.0.2.0/24 if 2
+  // 10.0.3.0/24 if 3
+  for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++) {
+    RoutingTableEntry entry = {
+        .addr = addrs[i] & 0x00FFFFFF, // big endian
+        .len = 24,        // small endian
+        .if_index = i,    // small endian
+        .nexthop = 0      // big endian, means direct
+    };
+    update(true, entry);
+  }
+
+  uint64_t last_time = 0;
+  while (1) {
+    uint64_t time = HAL_GetTicks();
+    // when testing, you can change 30s to 5s
+    if (time > last_time + 30 * 1000) {
+      // TODO: send complete routing table to every interface
+      // ref. RFC2453 Section 3.8
+      // multicast MAC for 224.0.0.9 is 01:00:5e:00:00:09
+      printf("30s Timer\n");
+      // TODO: print complete routing table to stdout/stderr
+      last_time = time;
+>>>>>>> d0b63a038c6fcdf279169cdeb4b4b8d97820592b
     }
 
     // 0b. Add direct routes
@@ -57,6 +93,7 @@ int main(int argc, char *argv[]) {
         update(true, entry);
     }
 
+<<<<<<< HEAD
     uint64_t last_time = 0;
     // multicast MAC for 224.0.0.9 is 01:00:5e:00:00:09
     in_addr_t multi_addr = 0x090000e0;
@@ -75,6 +112,63 @@ int main(int argc, char *argv[]) {
             }
             printf("30s Timer\n");
             last_time = time;
+=======
+    // 1. validate
+    if (!validateIPChecksum(packet, res)) {
+      printf("Invalid IP Checksum\n");
+      continue;
+    }
+    in_addr_t src_addr, dst_addr;
+    // TODO: extract src_addr and dst_addr from packet (big endian)
+
+    // 2. check whether dst is me
+    bool dst_is_me = false;
+    for (int i = 0; i < N_IFACE_ON_BOARD; i++) {
+      if (memcmp(&dst_addr, &addrs[i], sizeof(in_addr_t)) == 0) {
+        dst_is_me = true;
+        break;
+      }
+    }
+    // TODO: handle rip multicast address(224.0.0.9)
+
+    if (dst_is_me) {
+      // 3a.1
+      RipPacket rip;
+      // check and validate
+      if (disassemble(packet, res, &rip)) {
+        if (rip.command == 1) {
+          // 3a.3 request, ref. RFC2453 Section 3.9.1
+          // only need to respond to whole table requests in the lab
+
+          RipPacket resp;
+          // TODO: fill resp
+
+          // TODO: fill IP headers
+          output[0] = 0x45;
+
+          // TODO: fill UDP headers
+          // port = 520
+          output[20] = 0x02;
+          output[21] = 0x08;
+
+          // assembleRIP
+          uint32_t rip_len = assemble(&resp, &output[20 + 8]);
+
+          // TODO: checksum calculation for ip and udp
+          // if you don't want to calculate udp checksum, set it to zero
+
+          // send it back
+          HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
+        } else {
+          // 3a.2 response, ref. RFC2453 Section 3.9.2
+          // TODO: update routing table
+          // new metric = ?
+          // update metric, if_index, nexthop
+          // HINT: handle nexthop = 0 case
+          // HINT: what is missing from RoutingTableEntry?
+          // you might want to use `query` and `update` but beware of the difference between exact match and longest prefix match
+          // optional: triggered updates? ref. RFC2453 3.10.1
+>>>>>>> d0b63a038c6fcdf279169cdeb4b4b8d97820592b
         }
 
         int mask = (1 << N_IFACE_ON_BOARD) - 1;
@@ -99,6 +193,7 @@ int main(int argc, char *argv[]) {
             printf("Invalid IP Checksum\n");
             continue;
         }
+<<<<<<< HEAD
 
         // extract src_addr and dst_addr from packet
         // big endian
@@ -190,6 +285,25 @@ int main(int argc, char *argv[]) {
                 printf("IP not found for %x\n", src_addr);
             }
         }
+=======
+        if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0) {
+          // found
+          memcpy(output, packet, res);
+          // update ttl and checksum
+          forward(output, res);
+          // TODO(optional): check ttl=0 case
+          HAL_SendIPPacket(dest_if, output, res, dest_mac);
+        } else {
+          // not found
+          // you can drop it
+          printf("ARP not found for nexthop %x\n", nexthop);
+        }
+      } else {
+        // not found
+        // TODO(optional): send ICMP Host Unreachable
+        printf("IP not found for src %x dst %x\n", src_addr, dst_addr);
+      }
+>>>>>>> d0b63a038c6fcdf279169cdeb4b4b8d97820592b
     }
     return 0;
 }
