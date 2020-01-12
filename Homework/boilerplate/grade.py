@@ -14,8 +14,8 @@ import signal
 import glob
 import traceback
 
-prefix = 'boilerplate'
-exe = prefix
+prefix = 'protocol'
+exe = 'boilerplate'
 if len(sys.argv) > 1:
     exe = sys.argv[1]
 

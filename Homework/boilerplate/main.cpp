@@ -18,62 +18,27 @@ extern uint32_t joinByte(const uint8_t* begin);
 extern void splitByte(uint8_t* begin, uint32_t variable);
 extern std::list<RoutingTableEntry>::iterator tableQuery(RoutingTableEntry *entry);
 
-void buildRipPacket(RipPacket *rip, uint32_t if_index); // from table to rip
+void buildRipPacket(RipPacket *rip, uint32_t if_index, std::list<RoutingTableEntry>::iterator begin, std::list<RoutingTableEntry>::iterator end); // from table to rip
 uint32_t buildIPPacket(const RipPacket* rip, uint8_t *output, uint32_t src_addr, uint32_t dst_addr); // from rip to ip
 bool updateRoutingTable(const RipPacket* rip, uint32_t src_addr, uint32_t if_index); // from rip to table
 bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src_addr, uint32_t if_index); // from rip entry to table entry
+void showRoutingTable();
 
 extern std::list<RoutingTableEntry> routingTable;
-uint8_t packet[2048];
-uint8_t output[2048];
-// 0: 192.168.3.2
-// 1: 192.168.4.1
+uint8_t packet[8192];
+uint8_t output[8192];
+// 0: 192.168.4.2
+// 1: 192.168.5.2
 // 2: 10.0.2.1
 // 3: 10.0.3.1
 // 你可以按需进行修改，注意端序
-in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0203a8c0, 0x0104a8c0, 0x0102000a, 0x0103000a};
+in_addr_t addrs[N_IFACE_ON_BOARD] = {0x0204a8c0, 0x0205a8c0, 0x0102000a, 0x0103000a};
 
 int main(int argc, char *argv[]) {
-<<<<<<< HEAD
     // 0a.
     int res = HAL_Init(1, addrs);
     if (res < 0) {
         return res;
-=======
-  // 0a.
-  int res = HAL_Init(1, addrs);
-  if (res < 0) {
-    return res;
-  }
-
-  // 0b. Add direct routes
-  // For example:
-  // 10.0.0.0/24 if 0
-  // 10.0.1.0/24 if 1
-  // 10.0.2.0/24 if 2
-  // 10.0.3.0/24 if 3
-  for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++) {
-    RoutingTableEntry entry = {
-        .addr = addrs[i] & 0x00FFFFFF, // big endian
-        .len = 24,        // small endian
-        .if_index = i,    // small endian
-        .nexthop = 0      // big endian, means direct
-    };
-    update(true, entry);
-  }
-
-  uint64_t last_time = 0;
-  while (1) {
-    uint64_t time = HAL_GetTicks();
-    // when testing, you can change 30s to 5s
-    if (time > last_time + 30 * 1000) {
-      // TODO: send complete routing table to every interface
-      // ref. RFC2453 Section 3.8
-      // multicast MAC for 224.0.0.9 is 01:00:5e:00:00:09
-      printf("30s Timer\n");
-      // TODO: print complete routing table to stdout/stderr
-      last_time = time;
->>>>>>> d0b63a038c6fcdf279169cdeb4b4b8d97820592b
     }
 
     // 0b. Add direct routes
@@ -88,87 +53,40 @@ int main(int argc, char *argv[]) {
             .len = 24,                      // small endian
             .if_index = i,                  // small endian
             .nexthop = 0,                   // big endian, means direct
-            .metric = 1                     // small endian
+            .metric = 1 << 24             // big endian
         };
         update(true, entry);
     }
 
-<<<<<<< HEAD
-    uint64_t last_time = 0;
     // multicast MAC for 224.0.0.9 is 01:00:5e:00:00:09
     in_addr_t multi_addr = 0x090000e0;
     macaddr_t multi_mac = {0x01, 0x00, 0x5e, 0x00, 0x00, 0x09};
+    uint64_t last_time = 0;
     while (1) {
         uint64_t time = HAL_GetTicks();
         if (time > last_time + 30 * 1000) { 
             // send complete routing table to every interface
             // ref. RFC2453 3.8
             for (int i = 0; i < N_IFACE_ON_BOARD; i++) {
-                RipPacket resp;
-                buildRipPacket(&resp, (uint32_t)i);
-                uint32_t ip_len;
-                ip_len = buildIPPacket(&resp, output, addrs[i], multi_addr);
-                HAL_SendIPPacket(i, output, ip_len, multi_mac);                                
+                std::list<RoutingTableEntry>::iterator begin = routingTable.begin();
+                std::list<RoutingTableEntry>::iterator end = begin;
+                for (int j = 0; j < routingTable.size(); j += RIP_MAX_ENTRY) {
+                    if (j + RIP_MAX_ENTRY >= routingTable.size()) {
+                        end = routingTable.end();
+                    } else {
+                        std::advance(end, RIP_MAX_ENTRY);
+                    }
+                    RipPacket resp;
+                    buildRipPacket(&resp, (uint32_t)i, begin, end);
+                    uint32_t ip_len;
+                    ip_len = buildIPPacket(&resp, output, addrs[i], multi_addr);
+                    HAL_SendIPPacket(i, output, ip_len, multi_mac);
+                    std::advance(begin, RIP_MAX_ENTRY);
+                }                         
             }
+            showRoutingTable();
             printf("30s Timer\n");
             last_time = time;
-=======
-    // 1. validate
-    if (!validateIPChecksum(packet, res)) {
-      printf("Invalid IP Checksum\n");
-      continue;
-    }
-    in_addr_t src_addr, dst_addr;
-    // TODO: extract src_addr and dst_addr from packet (big endian)
-
-    // 2. check whether dst is me
-    bool dst_is_me = false;
-    for (int i = 0; i < N_IFACE_ON_BOARD; i++) {
-      if (memcmp(&dst_addr, &addrs[i], sizeof(in_addr_t)) == 0) {
-        dst_is_me = true;
-        break;
-      }
-    }
-    // TODO: handle rip multicast address(224.0.0.9)
-
-    if (dst_is_me) {
-      // 3a.1
-      RipPacket rip;
-      // check and validate
-      if (disassemble(packet, res, &rip)) {
-        if (rip.command == 1) {
-          // 3a.3 request, ref. RFC2453 Section 3.9.1
-          // only need to respond to whole table requests in the lab
-
-          RipPacket resp;
-          // TODO: fill resp
-
-          // TODO: fill IP headers
-          output[0] = 0x45;
-
-          // TODO: fill UDP headers
-          // port = 520
-          output[20] = 0x02;
-          output[21] = 0x08;
-
-          // assembleRIP
-          uint32_t rip_len = assemble(&resp, &output[20 + 8]);
-
-          // TODO: checksum calculation for ip and udp
-          // if you don't want to calculate udp checksum, set it to zero
-
-          // send it back
-          HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
-        } else {
-          // 3a.2 response, ref. RFC2453 Section 3.9.2
-          // TODO: update routing table
-          // new metric = ?
-          // update metric, if_index, nexthop
-          // HINT: handle nexthop = 0 case
-          // HINT: what is missing from RoutingTableEntry?
-          // you might want to use `query` and `update` but beware of the difference between exact match and longest prefix match
-          // optional: triggered updates? ref. RFC2453 3.10.1
->>>>>>> d0b63a038c6fcdf279169cdeb4b4b8d97820592b
         }
 
         int mask = (1 << N_IFACE_ON_BOARD) - 1;
@@ -193,7 +111,6 @@ int main(int argc, char *argv[]) {
             printf("Invalid IP Checksum\n");
             continue;
         }
-<<<<<<< HEAD
 
         // extract src_addr and dst_addr from packet
         // big endian
@@ -224,13 +141,23 @@ int main(int argc, char *argv[]) {
                 if (rip.command == 1) {
                     // 3a.3 request, ref. RFC2453 3.9.1
                     // only need to respond to whole table requests in the lab
-                    RipPacket resp;
-                    buildRipPacket(&resp, (uint32_t)if_index);
-                    // when response, dst_addr as src and src_addr as dst
-                    uint32_t ip_len;
-                    ip_len = buildIPPacket(&resp, output, dst_addr, src_addr);
-                    // send it back
-                    HAL_SendIPPacket(if_index, output, ip_len, src_mac);
+                    std::list<RoutingTableEntry>::iterator begin = routingTable.begin();
+                    std::list<RoutingTableEntry>::iterator end = begin;
+                    for (int j = 0; j < routingTable.size(); j += RIP_MAX_ENTRY) {
+                        if (j + RIP_MAX_ENTRY >= routingTable.size()) {
+                            end = routingTable.end();
+                        } else {
+                            std::advance(end, RIP_MAX_ENTRY);
+                        }
+                        RipPacket resp;
+                        buildRipPacket(&resp, (uint32_t)if_index, begin, end);
+                        // when response, dst_addr as src and src_addr as dst
+                        uint32_t ip_len;
+                        ip_len = buildIPPacket(&resp, output, dst_addr, src_addr);
+                        // send it back
+                        HAL_SendIPPacket(if_index, output, ip_len, src_mac);
+                        std::advance(begin, RIP_MAX_ENTRY);
+                    }
                 } else {
                     // 3a.2 response, ref. RFC2453 3.9.2
                     // update routing table
@@ -241,13 +168,24 @@ int main(int argc, char *argv[]) {
                     if (updateRoutingTable(&rip, src_addr, (uint32_t)if_index)) {
                         for (int i = 0; i < N_IFACE_ON_BOARD; i++) {
                             if (i != if_index) {
-                                RipPacket resp;
-                                buildRipPacket(&resp, (uint32_t)i);
-                                uint32_t ip_len;
-                                ip_len = buildIPPacket(&resp, output, addrs[i], multi_addr);
-                                HAL_SendIPPacket(i, output, ip_len, multi_mac);                                
+                                std::list<RoutingTableEntry>::iterator begin = routingTable.begin();
+                                std::list<RoutingTableEntry>::iterator end = begin;
+                                for (int j = 0; j < routingTable.size(); j += RIP_MAX_ENTRY) {
+                                    if (j + RIP_MAX_ENTRY >= routingTable.size()) {
+                                        end = routingTable.end();
+                                    } else {
+                                        std::advance(end, RIP_MAX_ENTRY);
+                                    }
+                                    RipPacket resp;
+                                    buildRipPacket(&resp, (uint32_t)i, begin, end);
+                                    uint32_t ip_len;
+                                    ip_len = buildIPPacket(&resp, output, addrs[i], multi_addr);
+                                    HAL_SendIPPacket(i, output, ip_len, multi_mac);  
+                                    std::advance(begin, RIP_MAX_ENTRY);
+                                }                           
                             }
                         }
+                        showRoutingTable();
                     }
                 }
             }
@@ -285,36 +223,17 @@ int main(int argc, char *argv[]) {
                 printf("IP not found for %x\n", src_addr);
             }
         }
-=======
-        if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0) {
-          // found
-          memcpy(output, packet, res);
-          // update ttl and checksum
-          forward(output, res);
-          // TODO(optional): check ttl=0 case
-          HAL_SendIPPacket(dest_if, output, res, dest_mac);
-        } else {
-          // not found
-          // you can drop it
-          printf("ARP not found for nexthop %x\n", nexthop);
-        }
-      } else {
-        // not found
-        // TODO(optional): send ICMP Host Unreachable
-        printf("IP not found for src %x dst %x\n", src_addr, dst_addr);
-      }
->>>>>>> d0b63a038c6fcdf279169cdeb4b4b8d97820592b
     }
     return 0;
 }
 
-void buildRipPacket(RipPacket *rip, uint32_t if_index) {
+void buildRipPacket(RipPacket *rip, uint32_t if_index, std::list<RoutingTableEntry>::iterator begin, std::list<RoutingTableEntry>::iterator end) {
     int i = 0;
-    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end(); it++) {
+    for (std::list<RoutingTableEntry>::iterator it = begin; it != end; it++) {
         if (it -> nexthop == 0 || it -> if_index != if_index) {
             RipEntry *entry = (rip -> entries) + i;
             entry -> addr = it -> addr;
-            entry -> mask = it -> len;
+            entry -> mask = (1 << it -> len) -1;
             entry -> nexthop = it -> nexthop;
             entry -> metric = it -> metric;  
             i++;  
@@ -380,14 +299,27 @@ bool updateRoutingTable(const RipPacket* rip, uint32_t src_addr, uint32_t if_ind
 }
 
 bool updateRoutingEntry(const RipEntry *ripEntry, RoutingTableEntry *tableEntry, uint32_t src_addr, uint32_t if_index) {
+    tableEntry -> addr = ripEntry -> addr;
+    tableEntry -> len = (uint32_t) (ripEntry -> mask == 0 ? 0 : 32 - __builtin_clz(ripEntry -> mask));
     std::list<RoutingTableEntry>::iterator it = tableQuery(tableEntry);
-    if (it != routingTable.end() && it -> metric <= ripEntry -> metric + 1) {
+    if (it != routingTable.end() && it -> metric <= ripEntry -> metric + (1 << 24 )) {
         return false;
     }
-    tableEntry -> addr = ripEntry -> addr;
-    tableEntry -> len = ripEntry -> mask;
     tableEntry -> if_index = if_index;
     tableEntry -> nexthop = src_addr;
-    tableEntry -> metric = ripEntry -> metric + 1;
+    tableEntry -> metric = ripEntry -> metric + (1 << 24);
     return true;
+}
+
+void showRoutingTable() {
+    printf("Routing Table : \n");
+    int i = 0;
+    for (std::list<RoutingTableEntry>::iterator it = routingTable.begin(); it != routingTable.end() && i < 10; it++) {
+            printf("entry %d:  ", i);
+            printf("addr: %08x  len: %08x  if_index: %08x  nexthop: %08x  metric: %08x\n", it->addr, it->len, it->if_index, it->nexthop, it->metric);
+            i++;  
+    }
+    if (i >= 10) {
+        printf("entry num: %d\n", i);
+    }
 }
